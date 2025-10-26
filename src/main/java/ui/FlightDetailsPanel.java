@@ -1,0 +1,150 @@
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/GUIForms/JPanel.java to edit this template
+ */
+package ui;
+
+import db.DatabaseConnection;
+import java.awt.BorderLayout;
+import java.awt.Component;
+import java.awt.Font;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.table.DefaultTableModel;
+
+/**
+ *
+ * @author Dell
+ */
+public class FlightDetailsPanel extends javax.swing.JPanel {
+        private MainFrame mainframe;
+    private JTable tableBookings;
+    private JLabel lblFlightInfo;
+    private JLabel lblRevenue;
+    private JScrollPane scrollPane;
+    /**
+     * Creates new form FlightDetailsPanel
+     */
+    public FlightDetailsPanel(MainFrame mainframe) {
+        this.mainframe = mainframe;
+        initComponents();
+    }
+    
+    public void setAllData(int scheduleId){
+         removeAll(); // clear previous content
+        setLayout(new BorderLayout(10, 10));
+
+        JLabel lblFlightInfo = new JLabel("Loading flight details...");
+        lblFlightInfo.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        add(lblFlightInfo, BorderLayout.NORTH);
+
+        // Table to show booking details
+        String[] cols = {"Booking ID", "User Name", "Seat Class", "Seats", "Total Price", "Payment Status"};
+        DefaultTableModel model = new DefaultTableModel(cols, 0);
+        tableBookings = new JTable(model);
+        Component scrollPane = new JScrollPane(tableBookings);
+        add(scrollPane, BorderLayout.CENTER);
+
+        lblRevenue = new JLabel("Total Revenue: ₹0.00");
+        lblRevenue.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        add(lblRevenue, BorderLayout.SOUTH);
+
+        revalidate();
+        repaint();
+
+        // Now load data from DB
+        Connection conn = null;
+        PreparedStatement pst = null;
+        ResultSet rs = null;
+
+        try {
+            // 🔹 Connect to your database
+            conn = DatabaseConnection.getConnection();
+
+            // 🔹 1. Get flight schedule info
+            pst = conn.prepareStatement("SELECT * FROM flightschedule WHERE schedule_id = ?");
+            pst.setInt(1, scheduleId);
+            rs = pst.executeQuery();
+
+            if (rs.next()) {
+                String info = "<html>Flight ID: " + rs.getInt("schedule_id") +
+                        "<br>Flight No: " + rs.getString("flight_id") +
+                        "<br>From: " + rs.getString("from_location") +
+                        "<br>To: " + rs.getString("to_location") +
+                        "<br>Date: " + rs.getString("departure_time") +
+                        "<br>Time: " + rs.getString("arrival_time") + "</html>";
+                lblFlightInfo.setText(info);
+            } else {
+                lblFlightInfo.setText("No flight found with this Schedule ID: " + scheduleId);
+                return;
+            }
+
+            // 🔹 2. Get all bookings for this flight
+            pst = conn.prepareStatement(
+                    "SELECT b.booking_id, u.name, b.seat_class, b.number_of_seats, b.total_price, b.payment_status " +
+                            "FROM booking b JOIN user u ON b.user_id = u.user_id WHERE b.schedule_id = ?");
+            pst.setInt(1, scheduleId);
+            rs = pst.executeQuery();
+
+            double totalRevenue = 0.0;
+            while (rs.next()) {
+                Object[] row = {
+                        rs.getInt("booking_id"),
+                        rs.getString("name"),
+                        rs.getString("seat_class"),
+                        rs.getInt("number_of_seats"),
+                        rs.getDouble("total_price"),
+                        rs.getString("payment_status")
+                };
+                model.addRow(row);
+
+                // Count only PAID bookings in revenue
+                if ("paid".equalsIgnoreCase(rs.getString("payment_status"))) {
+                    totalRevenue += rs.getDouble("total_price");
+                }
+            }
+
+            lblRevenue.setText("Total Revenue: ₹" + String.format("%.2f", totalRevenue));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Error loading flight details: " + e.getMessage());
+        } finally {
+            try {
+                if (rs != null) rs.close();
+                if (pst != null) pst.close();
+                if (conn != null) conn.close();
+            } catch (SQLException ignored) {}
+        }
+    }
+    /**
+     * This method is called from within the constructor to initialize the form.
+     * WARNING: Do NOT modify this code. The content of this method is always
+     * regenerated by the Form Editor.
+     */
+    @SuppressWarnings("unchecked")
+    // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
+    private void initComponents() {
+
+        javax.swing.GroupLayout layout = new javax.swing.GroupLayout(this);
+        this.setLayout(layout);
+        layout.setHorizontalGroup(
+            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGap(0, 1289, Short.MAX_VALUE)
+        );
+        layout.setVerticalGroup(
+            layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGap(0, 600, Short.MAX_VALUE)
+        );
+    }// </editor-fold>//GEN-END:initComponents
+
+
+    // Variables declaration - do not modify//GEN-BEGIN:variables
+    // End of variables declaration//GEN-END:variables
+}
